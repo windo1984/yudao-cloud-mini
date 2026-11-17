@@ -173,4 +173,10 @@ public interface ErrorCodeConstants {
     // ========== 站内信发送 1-002-028-000 ==========
     ErrorCode NOTIFY_SEND_TEMPLATE_PARAM_MISS = new ErrorCode(1_002_028_000, "模板参数({})缺失");
 
+    // ========== SSO 单点登录（DaxPay 为登录入口） 1-002-029-000 ==========
+    ErrorCode SSO_DAXPAY_DISABLED = new ErrorCode(1_002_029_000, "统一登录未启用，请先开启配置 yudao.sso.daxpay.enable");
+    ErrorCode SSO_DAXPAY_SIGN_INVALID = new ErrorCode(1_002_029_001, "统一登录请求校验失败：{}");
+    ErrorCode SSO_DAXPAY_PARAM_INVALID = new ErrorCode(1_002_029_002, "统一登录请求参数不合法：{}");
+    ErrorCode SSO_DAXPAY_USER_CREATE_FAIL = new ErrorCode(1_002_029_003, "统一登录本地账号匹配失败：{}");
+
 }

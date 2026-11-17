@@ -1,0 +1,38 @@
+# ==========================================================================
+# 统一登录：yudao（yudao-cloud-mini-fork）侧配置
+# 放置位置：system-server 或 yudao-server 的 Nacos 配置 / application-*.yaml
+# 关键：账号密码只在 DaxPay 校验，yudao 不保存、也不校验任何 DaxPay 密码
+# ==========================================================================
+
+yudao:
+  sso:
+    daxpay:
+      # 总开关。关闭后 /admin-api/system/sso/daxpay/exchange 直接报错，
+      # 不影响 yudao 原有的账号密码登录（原有登录链路完全未改动）
+      enable: true
+
+      # 与网关 ft.gateway.sso.shared-secret 必须完全一致
+      # 生成：openssl rand -base64 32
+      exchange-secret: ${SSO_SHARED_SECRET:请替换为 32 位以上随机串}
+
+      # 签名时间戳容忍窗口（秒），超出判定为重放
+      timestamp-tolerance-seconds: 300
+
+      # 签发 yudao 令牌使用的 OAuth2 客户端编号，需已存在 system_oauth2_client 中
+      client-id: default
+
+      # 本地没有同名账号时是否自动创建（账号来源只有 DaxPay 一个）
+      auto-create: true
+
+      # 自动创建账号时分配的默认角色编号
+      # 为空会导致新账号登录后后台空白（没有任何菜单），上线前务必配好
+      # 编号来自 system_role.id，例：给一个只读基础角色 [2]
+      default-role-ids:
+        - 2
+
+      # 自动创建账号的随机密码长度（4~16），用户不会使用这个密码
+      random-password-length: 12
+
+      # DaxPay 账号含 _ - . @ 等字符、或长度不在 4~30 时，
+      # yudao 账号 = 前缀 + SHA-256(account) 前 10 位
+      username-fallback-prefix: dx
