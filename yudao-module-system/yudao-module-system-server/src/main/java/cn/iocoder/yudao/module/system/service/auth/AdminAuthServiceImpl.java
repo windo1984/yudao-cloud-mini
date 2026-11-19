@@ -2,7 +2,13 @@ package cn.iocoder.yudao.module.system.service.auth;
 
 import cn.hutool.core.lang.Pair;
 import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.http.HttpRequest;
+import cn.hutool.http.HttpResponse;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.util.monitor.TracerUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
@@ -74,6 +80,14 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     @Resource
     private SmsCodeApi smsCodeApi;
 
+    /** ft-iam 服务地址（直连，不经过网关，避免网关拦截这个免登接口） */
+    @Value("${yudao.sso.iam-url:http://127.0.0.1:19310}")
+    private String iamSsoUrl;
+
+    /** 与 ft-iam 约定的共享密钥（请求头 X-Sso-Secret） */
+    @Value("${yudao.sso.secret:fighter-iam-sso}")
+    private String iamSsoSecret;
+
     /**
      * 验证码的开关，默认为 true
      */
@@ -115,6 +129,56 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         }
         // 创建 Token 令牌，记录登录日志
         return createTokenAfterLoginSuccess(user, reqVO.getUsername(), LoginLogTypeEnum.LOGIN_USERNAME);
+    }
+
+    @Override
+    @DataPermission(enable = false)
+    public AuthLoginRespVO loginByIamTicket(String ticket) {
+        if (StrUtil.isBlank(ticket)) {
+            throw exception(AUTH_LOGIN_BAD_CREDENTIALS);
+        }
+        JSONObject ssoUser = verifyIamTicket(ticket);
+        String username = ssoUser.getStr("username");
+        if (StrUtil.isBlank(username)) {
+            throw exception(AUTH_LOGIN_BAD_CREDENTIALS);
+        }
+        AdminUserDO user = userService.getUserByUsername(username);
+        if (user == null) {
+            log.warn("统一认证登录失败：本地不存在账号 {}", username);
+            throw exception(USER_NOT_EXISTS);
+        }
+        log.info("统一认证登录成功: iam 账号={} 映射到 userId={}", username, user.getId());
+        // 生成令牌并记录登录日志（与账号密码登录同一条链路，后续权限/日志逻辑完全一致）
+        return createTokenAfterLoginSuccess(user, username, LoginLogTypeEnum.LOGIN_USERNAME);
+    }
+
+    /**
+     * 调用 ft-iam 校验并消费一次性 ticket，返回 iam 侧统一身份。
+     *
+     * <p>直连 ft-iam（不经网关），避免网关的鉴权拦截这个免登接口。</p>
+     */
+    private JSONObject verifyIamTicket(String ticket) {
+        String url = StrUtil.removeSuffix(iamSsoUrl, "/") + "/auth/sso/ticket/verify";
+        try (HttpResponse response = HttpRequest.post(url)
+                .header("X-Sso-Secret", iamSsoSecret)
+                .header("Content-Type", "application/json")
+                .body(JSONUtil.createObj().set("ticket", ticket).toString())
+                .timeout(5000)
+                .execute()) {
+            JSONObject result = JSONUtil.parseObj(response.body());
+            if (result.getInt("code", -1) != 0) {
+                log.warn("统一认证 ticket 校验失败: {}", result.getStr("msg", ""));
+                throw exception(AUTH_LOGIN_BAD_CREDENTIALS);
+            }
+            return result.getJSONObject("data");
+        }
+        catch (ServiceException e) {
+            throw e;
+        }
+        catch (Exception e) {
+            log.error("调用 ft-iam 校验 ticket 失败: {}", e.getMessage(), e);
+            throw exception(AUTH_LOGIN_BAD_CREDENTIALS);
+        }
     }
 
     @Override

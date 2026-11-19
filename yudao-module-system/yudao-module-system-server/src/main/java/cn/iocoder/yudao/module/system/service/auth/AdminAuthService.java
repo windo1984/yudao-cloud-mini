@@ -31,6 +31,17 @@ public interface AdminAuthService {
     AuthLoginRespVO login(@Valid AuthLoginReqVO reqVO);
 
     /**
+     * 统一认证（ft-iam ticket）登录
+     *
+     * <p>基座 ft-layout 以 ft-iam 为唯一登录入口，打开本应用时带来一次性 ticket；
+     * 本方法用 ticket 向 ft-iam 换回统一身份，按账号映射到本地用户后签发本应用的令牌。</p>
+     *
+     * @param ticket 一次性票据
+     * @return 登录结果
+     */
+    AuthLoginRespVO loginByIamTicket(String ticket);
+
+    /**
      * 轮询二维码，确认后登录并签发电脑端令牌
      *
      * @param reqVO 二维码编号及领取凭证

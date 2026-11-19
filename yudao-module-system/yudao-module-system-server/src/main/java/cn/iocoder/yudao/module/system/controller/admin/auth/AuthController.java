@@ -74,6 +74,14 @@ public class AuthController {
         return success(authService.login(reqVO));
     }
 
+    @PostMapping("/iam-login")
+    @PermitAll
+    @Operation(summary = "统一认证（ft-iam ticket）登录",
+            description = "基座 ft-layout 打开本应用时带来一次性 ticket，用它换取本应用的令牌")
+    public CommonResult<AuthLoginRespVO> iamLogin(@RequestBody @Valid AuthIamLoginReqVO reqVO) {
+        return success(authService.loginByIamTicket(reqVO.getTicket()));
+    }
+
     @PostMapping("/logout")
     @PermitAll
     @Operation(summary = "登出系统")
